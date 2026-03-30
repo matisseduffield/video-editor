@@ -9,11 +9,14 @@ import {
   retryJob as retryJobBackend,
   removeJob as removeJobBackend,
   moveJob as moveJobBackend,
+  clearCompleted as clearCompletedBackend,
+  getJobs,
   startProcessing,
   onJobProgress,
   onJobStatus,
   probeVideo,
   validateFfmpeg,
+  validateDependencies,
   extractThumbnail,
   startWatchFolder,
   stopWatchFolder,
@@ -38,6 +41,39 @@ export function MainPanel({ settings }: MainPanelProps) {
   const isProcessingRef = useRef(false);
   const unlistenRefs = useRef<UnlistenFn[]>([]);
 
+  // Restore persisted jobs on app launch
+  useEffect(() => {
+    getJobs().then((saved) => {
+      if (saved.length > 0) {
+        setJobs(saved);
+        // Re-extract thumbnails for jobs that had them (paths are temp, may be gone)
+        for (const job of saved) {
+          if (job.status !== "completed" && job.status !== "failed") continue;
+          extractThumbnail(job.filePath, job.id)
+            .then((thumbPath) => {
+              const thumbUrl = convertFileSrc(thumbPath);
+              setJobs((prev) =>
+                prev.map((j) => (j.id === job.id ? { ...j, thumbnailPath: thumbUrl } : j))
+              );
+            })
+            .catch(() => {});
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Validate dependencies on startup
+  useEffect(() => {
+    validateDependencies().then((status) => {
+      if (status.missing.length > 0) {
+        toast.error(`Missing dependencies: ${status.missing.join(", ")}`, {
+          description: "Some features may not work. Ensure FFmpeg and Python are bundled or on PATH.",
+          duration: 10000,
+        });
+      }
+    }).catch(() => {});
+  }, []);
+
   // Listen for job progress events from Rust backend
   useEffect(() => {
     let cancelled = false;
@@ -61,8 +97,14 @@ export function MainPanel({ settings }: MainPanelProps) {
                 ? {
                     ...j,
                     status: payload.status as JobStatus,
+                    progress: payload.status === "completed" ? 100 : j.progress,
                     error: payload.error,
+                    statusDetail: payload.detail ?? j.statusDetail,
                     outputPaths: payload.outputPaths ?? j.outputPaths,
+                    startedAt:
+                      payload.status === "processing" && !j.startedAt
+                        ? new Date().toISOString()
+                        : j.startedAt,
                     completedAt:
                       payload.status === "completed" || payload.status === "failed"
                         ? new Date().toISOString()
@@ -320,11 +362,7 @@ export function MainPanel({ settings }: MainPanelProps) {
   };
 
   const clearCompleted = () => {
-    jobs.forEach((j) => {
-      if (j.status === "completed" || j.status === "cancelled") {
-        removeJobBackend(j.id).catch(() => {});
-      }
-    });
+    clearCompletedBackend().catch(() => {});
     setJobs((prev) =>
       prev.filter((j) => j.status !== "completed" && j.status !== "cancelled")
     );
@@ -402,6 +440,7 @@ export function MainPanel({ settings }: MainPanelProps) {
   const queuedCount = jobs.filter((j) => j.status === "queued").length;
   const processingCount = jobs.filter((j) => j.status === "processing").length;
   const failedCount = jobs.filter((j) => j.status === "failed").length;
+  const completedCount = jobs.filter((j) => j.status === "completed").length;
 
   const overallProgress = jobs.length > 0
     ? Math.round(
@@ -420,6 +459,8 @@ export function MainPanel({ settings }: MainPanelProps) {
         queuedCount={queuedCount}
         processingCount={processingCount}
         failedCount={failedCount}
+        completedCount={completedCount}
+        totalCount={jobs.length}
         onCancelAll={cancelAll}
         onRetryAllFailed={retryAllFailed}
         onClearCompleted={clearCompleted}

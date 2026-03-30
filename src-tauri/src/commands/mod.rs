@@ -78,6 +78,13 @@ pub async fn remove_job(manager: State<'_, JobManager>, job_id: String) -> Resul
     manager.remove_job(&job_id).await
 }
 
+/// Clear all completed and cancelled jobs
+#[tauri::command]
+pub async fn clear_completed(manager: State<'_, JobManager>) -> Result<(), String> {
+    manager.clear_completed().await;
+    Ok(())
+}
+
 /// Move a job up or down in the queue
 #[tauri::command]
 pub async fn move_job(
@@ -101,13 +108,7 @@ pub async fn start_processing(
     let ffprobe_path = crate::ffmpeg::get_ffprobe_path(&app).unwrap_or_default();
 
     // Collect queued jobs
-    let queued_jobs: Vec<Job> = {
-        let jobs = manager.jobs.lock().await;
-        jobs.iter()
-            .filter(|j| j.status == JobStatus::Queued)
-            .cloned()
-            .collect()
-    };
+    let queued_jobs: Vec<Job> = manager.get_queued_jobs().await;
 
     if queued_jobs.is_empty() {
         return Err("No queued jobs to process".to_string());
@@ -189,11 +190,7 @@ async fn process_single_job(
     let job_id = job.id.clone();
 
     // Check if job was cancelled before we start
-    let is_cancelled = {
-        let jobs = manager.jobs.lock().await;
-        jobs.iter().any(|j| j.id == job_id && j.status == JobStatus::Cancelled)
-    };
-    if is_cancelled { return; }
+    if manager.is_cancelled(&job_id).await { return; }
 
     // Set status to Processing
     manager.set_status(&job_id, JobStatus::Processing, None).await;
@@ -240,6 +237,11 @@ async fn process_single_job(
 
     if use_hook {
         emit_progress(&app, &manager, &job_id, 1).await;
+        app.emit("job-status", serde_json::json!({
+            "jobId": &job_id,
+            "status": "processing",
+            "detail": "Generating TTS\u{2026}"
+        })).ok();
         std::fs::create_dir_all(&temp_dir).ok();
         let audio_path = temp_dir.join("tts.mp3");
         match crate::ffmpeg::generate_tts_audio(
@@ -309,11 +311,21 @@ async fn process_single_job(
         let fmt_start = render_phase_start + (fmt_idx as f64 * render_range / format_count) as u8;
         let fmt_end = render_phase_start + ((fmt_idx as f64 + 1.0) * render_range / format_count) as u8;
         // Check cancellation between formats
-        let is_cancelled = {
-            let jobs = manager.jobs.lock().await;
-            jobs.iter().any(|j| j.id == job_id && j.status == JobStatus::Cancelled)
-        };
+        let is_cancelled = manager.is_cancelled(&job_id).await;
         if is_cancelled { break; }
+
+        // Emit per-format detail label
+        let format_label = if format_count > 1.0 {
+            format!("Rendering ({}/{})\u{2026}", fmt_idx + 1, format_count as usize)
+        } else {
+            "Rendering\u{2026}".to_string()
+        };
+        app.emit("job-status", serde_json::json!({
+            "jobId": &job_id,
+            "status": "processing",
+            "detail": &format_label
+        })).ok();
+
         let output_path = build_output_path(&job.file_path, &output_dir, format);
 
         // Ensure output directory exists
@@ -444,10 +456,7 @@ async fn process_single_job(
 
         match result {
             Ok(()) => {
-                let mut jobs = manager.jobs.lock().await;
-                if let Some(j) = jobs.iter_mut().find(|j| j.id == job_id) {
-                    j.output_paths.push(output_path);
-                }
+                manager.push_output_path(&job_id, output_path).await;
             }
             Err(e) => {
                 manager
@@ -464,15 +473,8 @@ async fn process_single_job(
     }
 
     // If not failed, mark as completed
-    let is_still_processing = {
-        let jobs = manager.jobs.lock().await;
-        jobs.iter().any(|j| j.id == job_id && j.status == JobStatus::Processing)
-    };
-    if is_still_processing {
-        let output_paths = {
-            let jobs = manager.jobs.lock().await;
-            jobs.iter().find(|j| j.id == job_id).map(|j| j.output_paths.clone()).unwrap_or_default()
-        };
+    if manager.is_processing(&job_id).await {
+        let output_paths = manager.get_output_paths(&job_id).await;
         manager.set_status(&job_id, JobStatus::Completed, None).await;
         manager.update_progress(&job_id, 100).await;
         app.emit("job-status", serde_json::json!({
@@ -533,6 +535,7 @@ async fn run_ffmpeg_simple(
 /// Run FFmpeg and parse stderr for progress.
 /// `progress_start` and `progress_end` define the overall progress range
 /// this FFmpeg invocation maps to (e.g. 15..95 for the render phase).
+/// Times out after max(30 min, 10× video duration) to prevent hung processes.
 async fn run_ffmpeg_with_progress(
     ffmpeg_path: &std::path::PathBuf,
     args: &[String],
@@ -545,6 +548,9 @@ async fn run_ffmpeg_with_progress(
 ) -> Result<(), String> {
     use tokio::io::AsyncReadExt;
     use tokio::process::Command;
+
+    // Timeout: max(30 min, 10× video duration)
+    let timeout_secs = ((duration_secs * 10.0) as u64).max(1800);
 
     let mut cmd = Command::new(ffmpeg_path);
     cmd.args(args)
@@ -583,11 +589,7 @@ async fn run_ffmpeg_with_progress(
                         line_buf.clear();
 
                         // Check if job was cancelled
-                        let is_cancelled = {
-                            let jobs = manager.jobs.lock().await;
-                            jobs.iter().any(|j| j.id == job_id && j.status == JobStatus::Cancelled)
-                        };
-                        if is_cancelled {
+                        if manager.is_cancelled(job_id).await {
                             child.kill().await.ok();
                             return Err("Job cancelled".to_string());
                         }
@@ -600,10 +602,7 @@ async fn run_ffmpeg_with_progress(
                                 let range = (progress_end - progress_start) as f64;
                                 let progress = (progress_start as f64 + ffmpeg_pct * range).min(progress_end.saturating_sub(1) as f64) as u8;
                                 // Throttle: only emit if progress actually changed
-                                let current = {
-                                    let jobs = manager.jobs.lock().await;
-                                    jobs.iter().find(|j| j.id == job_id).map(|j| j.progress).unwrap_or(0)
-                                };
+                                let current = manager.get_progress(job_id).await;
                                 if progress != current {
                                     manager.update_progress(job_id, progress).await;
                                     app.emit("job-progress", serde_json::json!({
@@ -627,10 +626,16 @@ async fn run_ffmpeg_with_progress(
         }
     }
 
-    let status = child
-        .wait()
-        .await
-        .map_err(|e| format!("FFmpeg process error: {}", e))?;
+    let status = match tokio::time::timeout(
+        std::time::Duration::from_secs(timeout_secs),
+        child.wait(),
+    ).await {
+        Ok(result) => result.map_err(|e| format!("FFmpeg process error: {}", e))?,
+        Err(_) => {
+            child.kill().await.ok();
+            return Err(format!("FFmpeg timed out after {} minutes", timeout_secs / 60));
+        }
+    };
 
     if status.success() {
         Ok(())
@@ -853,6 +858,27 @@ pub async fn validate_ffmpeg(app: tauri::AppHandle) -> Result<String, String> {
     } else {
         Err("FFmpeg binary found but failed to run".to_string())
     }
+}
+
+/// Validate all required dependencies (FFmpeg, ffprobe, Python) on app launch.
+/// Returns a JSON object with the status of each dependency.
+#[tauri::command]
+pub async fn validate_dependencies(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let ffmpeg_ok = crate::ffmpeg::get_ffmpeg_path(&app).is_ok();
+    let ffprobe_ok = crate::ffmpeg::get_ffprobe_path(&app).is_ok();
+    let python_ok = crate::ffmpeg::get_python_path(&app).is_ok();
+
+    let mut missing = Vec::new();
+    if !ffmpeg_ok { missing.push("FFmpeg"); }
+    if !ffprobe_ok { missing.push("FFprobe"); }
+    if !python_ok { missing.push("Python"); }
+
+    Ok(serde_json::json!({
+        "ffmpeg": ffmpeg_ok,
+        "ffprobe": ffprobe_ok,
+        "python": python_ok,
+        "missing": missing,
+    }))
 }
 
 /// Extract a thumbnail frame from a video file at ~1s via FFmpeg

@@ -24,7 +24,7 @@ import { openOutputFolder } from "@/hooks/useTauri";
 import { toast } from "sonner";
 import { useState } from "react";
 import { VideoPlayer } from "@/components/dashboard/VideoPlayer";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 
 interface JobCardProps {
@@ -66,6 +66,14 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(0)} KB`;
 }
 
+function formatEta(job: Job): string | null {
+  if (job.status !== "processing" || !job.startedAt || job.progress < 2) return null;
+  const elapsed = (Date.now() - new Date(job.startedAt).getTime()) / 1000;
+  const remaining = (elapsed / job.progress) * (100 - job.progress);
+  if (remaining < 60) return `~${Math.ceil(remaining)}s left`;
+  return `~${Math.ceil(remaining / 60)}m left`;
+}
+
 export function JobCard({
   job,
   index,
@@ -81,6 +89,7 @@ export function JobCard({
   const StatusIcon = config.icon;
   const isActive = job.status === "queued" || job.status === "processing";
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
+  const [errorExpanded, setErrorExpanded] = useState(false);
 
   return (
     <>
@@ -129,11 +138,23 @@ export function JobCard({
 
           {/* Progress bar for active jobs */}
           {job.status === "processing" && (
-            <div className="flex items-center gap-2 mt-1.5">
-              <Progress value={job.progress} shimmer className="flex-1" />
-              <span className="text-xs text-muted-foreground w-8 text-right">
-                {job.progress}%
-              </span>
+            <div className="mt-1.5">
+              {job.statusDetail && (
+                <span className="text-[10px] text-muted-foreground/70 block mb-0.5">
+                  {job.statusDetail}
+                </span>
+              )}
+              <div className="flex items-center gap-2">
+                <Progress value={job.progress} shimmer className="flex-1" />
+                <span className="text-xs text-muted-foreground w-8 text-right">
+                  {job.progress}%
+                </span>
+              </div>
+              {formatEta(job) && (
+                <span className="text-[10px] text-muted-foreground/60 mt-0.5 block">
+                  {formatEta(job)}
+                </span>
+              )}
             </div>
           )}
 
@@ -158,11 +179,36 @@ export function JobCard({
             </div>
           )}
 
-          {/* Error message */}
+          {/* Error message with expandable details */}
           {job.error && (
-            <p className="text-xs text-destructive mt-1 truncate">
-              {job.error}
-            </p>
+            <div className="mt-1">
+              <button
+                onClick={() => setErrorExpanded(!errorExpanded)}
+                className="text-xs text-destructive hover:underline flex items-center gap-1"
+              >
+                {errorExpanded ? "Hide details" : "Show error details"}
+              </button>
+              <AnimatePresence>
+                {errorExpanded && (
+                  <motion.pre
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="text-[10px] text-destructive/80 mt-1 p-2 bg-destructive/5 rounded-md overflow-x-auto whitespace-pre-wrap break-all max-h-32 overflow-y-auto"
+                  >
+                    {job.error}
+                  </motion.pre>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {/* Completed timestamp */}
+          {job.status === "completed" && job.completedAt && (
+            <span className="text-[10px] text-muted-foreground/60 mt-0.5 block">
+              Completed {new Date(job.completedAt).toLocaleString()}
+            </span>
           )}
 
           {/* Output paths for completed jobs */}

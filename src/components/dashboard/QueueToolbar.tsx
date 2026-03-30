@@ -13,6 +13,8 @@ interface QueueToolbarProps {
   queuedCount: number;
   processingCount: number;
   failedCount: number;
+  completedCount: number;
+  totalCount: number;
   onCancelAll: () => void;
   onRetryAllFailed: () => void;
   onClearCompleted: () => void;
@@ -28,6 +30,8 @@ export function QueueToolbar({
   queuedCount,
   processingCount,
   failedCount,
+  completedCount,
+  totalCount,
   onCancelAll,
   onRetryAllFailed,
   onClearCompleted,
@@ -58,6 +62,11 @@ export function QueueToolbar({
               <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                 {failedCount} failed
               </Badge>
+            )}
+            {isProcessing && (
+              <span className="text-[10px] text-muted-foreground ml-1">
+                {completedCount}/{totalCount} done
+              </span>
             )}
           </div>
         )}

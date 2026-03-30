@@ -27,6 +27,10 @@ export async function removeJob(jobId: string): Promise<void> {
   return invoke("remove_job", { jobId });
 }
 
+export async function clearCompleted(): Promise<void> {
+  return invoke("clear_completed");
+}
+
 export async function moveJob(
   jobId: string,
   direction: "up" | "down"
@@ -62,6 +66,17 @@ export async function openOutputFolder(filePath: string): Promise<void> {
 
 export async function validateFfmpeg(): Promise<string> {
   return invoke("validate_ffmpeg");
+}
+
+export interface DependencyStatus {
+  ffmpeg: boolean;
+  ffprobe: boolean;
+  python: boolean;
+  missing: string[];
+}
+
+export async function validateDependencies(): Promise<DependencyStatus> {
+  return invoke("validate_dependencies");
 }
 
 export interface GpuInfo {

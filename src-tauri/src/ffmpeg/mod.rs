@@ -454,19 +454,141 @@ fn build_caption_filters(
     filters.join(",")
 }
 
-/// Map font name from UI to a Windows font file path (triple-escaped colon for FFmpeg)
+/// Map font name from UI to an FFmpeg-compatible font file path.
+/// Platform-aware: resolves fonts on Windows, macOS, and Linux.
+/// Falls back through system fonts, then to a bundled fallback font.
 fn font_to_path(font: &str) -> String {
-    let path = match font {
-        "Arial Black" => "C\\\\\\:/Windows/Fonts/ariblk.ttf",
-        "Impact" => "C\\\\\\:/Windows/Fonts/impact.ttf",
-        "Montserrat" => "C\\\\\\:/Windows/Fonts/arial.ttf",   // fallback
-        "Bebas Neue" => "C\\\\\\:/Windows/Fonts/arial.ttf",   // fallback
-        "Oswald" => "C\\\\\\:/Windows/Fonts/arial.ttf",       // fallback
-        "Poppins" => "C\\\\\\:/Windows/Fonts/arial.ttf",      // fallback
-        "Roboto Bold" => "C\\\\\\:/Windows/Fonts/arialbd.ttf", // fallback
-        _ => "C\\\\\\:/Windows/Fonts/ariblk.ttf",
+    let candidates = font_candidates(font);
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return escape_font_path(path);
+        }
+    }
+    // Final fallback: use the first system candidate (FFmpeg will use its own default if missing)
+    escape_font_path(candidates.first().unwrap_or(&fallback_font_path()))
+}
+
+/// Escape a font file path for use in FFmpeg drawtext filter.
+/// On Windows, colons need triple-escaping for FFmpeg's parser.
+fn escape_font_path(path: &str) -> String {
+    if cfg!(target_os = "windows") {
+        path.replace('\\', "/").replace(':', "\\\\\\:")
+    } else {
+        path.replace(':', "\\:")
+    }
+}
+
+/// Get the platform-specific font file candidates for a given font name.
+fn font_candidates(font: &str) -> Vec<String> {
+    let mut paths = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    {
+        let fonts_dir = "C:/Windows/Fonts";
+        let filenames = match font {
+            "Arial Black" => vec!["ariblk.ttf"],
+            "Impact" => vec!["impact.ttf"],
+            "Montserrat" => vec!["Montserrat-Bold.ttf", "Montserrat-SemiBold.ttf", "arial.ttf"],
+            "Bebas Neue" => vec!["BebasNeue-Regular.ttf", "arial.ttf"],
+            "Oswald" => vec!["Oswald-Bold.ttf", "Oswald-SemiBold.ttf", "arial.ttf"],
+            "Poppins" => vec!["Poppins-Bold.ttf", "Poppins-SemiBold.ttf", "arial.ttf"],
+            "Roboto Bold" => vec!["Roboto-Bold.ttf", "arialbd.ttf"],
+            _ => vec!["ariblk.ttf", "arial.ttf"],
+        };
+        for f in filenames {
+            paths.push(format!("{}/{}", fonts_dir, f));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let dirs = ["/System/Library/Fonts", "/Library/Fonts", "~/Library/Fonts"];
+        let filenames = match font {
+            "Arial Black" => vec!["Arial Black.ttf", "Arial Bold.ttf"],
+            "Impact" => vec!["Impact.ttf"],
+            "Montserrat" => vec!["Montserrat-Bold.ttf", "Montserrat-SemiBold.otf"],
+            "Bebas Neue" => vec!["BebasNeue-Regular.ttf", "BebasNeue-Regular.otf"],
+            "Oswald" => vec!["Oswald-Bold.ttf"],
+            "Poppins" => vec!["Poppins-Bold.ttf"],
+            "Roboto Bold" => vec!["Roboto-Bold.ttf"],
+            _ => vec!["Arial Black.ttf", "Arial Bold.ttf", "Helvetica.ttc"],
+        };
+        for dir in &dirs {
+            let expanded = if dir.starts_with('~') {
+                if let Some(home) = std::env::var_os("HOME") {
+                    format!("{}{}", home.to_string_lossy(), &dir[1..])
+                } else {
+                    dir.to_string()
+                }
+            } else {
+                dir.to_string()
+            };
+            for f in &filenames {
+                paths.push(format!("{}/{}", expanded, f));
+            }
+        }
+        // macOS universal fallback
+        paths.push("/System/Library/Fonts/Helvetica.ttc".to_string());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let dirs = [
+            "/usr/share/fonts/truetype",
+            "/usr/share/fonts",
+            "/usr/local/share/fonts",
+        ];
+        let filenames = match font {
+            "Arial Black" => vec!["msttcorefonts/Arial_Black.ttf", "dejavu/DejaVuSans-Bold.ttf"],
+            "Impact" => vec!["msttcorefonts/Impact.ttf", "dejavu/DejaVuSans-Bold.ttf"],
+            "Montserrat" => vec!["montserrat/Montserrat-Bold.ttf"],
+            "Bebas Neue" => vec!["bebas-neue/BebasNeue-Regular.ttf"],
+            "Oswald" => vec!["oswald/Oswald-Bold.ttf"],
+            "Poppins" => vec!["poppins/Poppins-Bold.ttf"],
+            "Roboto Bold" => vec!["roboto/Roboto-Bold.ttf"],
+            _ => vec!["dejavu/DejaVuSans-Bold.ttf", "liberation/LiberationSans-Bold.ttf"],
+        };
+        for dir in &dirs {
+            for f in &filenames {
+                paths.push(format!("{}/{}", dir, f));
+            }
+        }
+        // Linux universal fallback
+        paths.push("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf".to_string());
+    }
+
+    paths
+}
+
+/// Get a platform-appropriate fallback font path (last resort).
+fn fallback_font_path() -> String {
+    if cfg!(target_os = "windows") {
+        "C:/Windows/Fonts/arial.ttf".to_string()
+    } else if cfg!(target_os = "macos") {
+        "/System/Library/Fonts/Helvetica.ttc".to_string()
+    } else {
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf".to_string()
+    }
+}
+
+/// Get a platform-appropriate monospace font path for typewriter effects.
+fn monospace_font_path() -> String {
+    let candidates: Vec<&str> = if cfg!(target_os = "windows") {
+        vec!["C:/Windows/Fonts/consola.ttf", "C:/Windows/Fonts/cour.ttf"]
+    } else if cfg!(target_os = "macos") {
+        vec!["/System/Library/Fonts/Menlo.ttc", "/System/Library/Fonts/Courier.dfont"]
+    } else {
+        vec![
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationMono-Bold.ttf",
+        ]
     };
-    path.to_string()
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return escape_font_path(path);
+        }
+    }
+    escape_font_path(candidates.first().unwrap_or(&""))
 }
 
 /// Get the video codec string, optionally GPU-accelerated.
@@ -604,7 +726,7 @@ pub fn build_typewriter_intro_args(
     let total_type_time = chars.len() as f64 * char_delay;
 
     let font_size = (height as f64 * 0.038).round() as i32;
-    let fontfile = "C\\\\\\:/Windows/Fonts/consola.ttf";
+    let fontfile = monospace_font_path();
 
     // filter_complex: freeze first frame, scale+blur it, overlay typewriter text
     // [0:v] → take 1 frame, loop it for the duration → scale to target → blur
@@ -747,4 +869,233 @@ pub fn build_concat_args(
     }
     args.push(output_path.to_string());
     args
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::*;
+
+    fn default_config() -> ProcessingConfig {
+        ProcessingConfig {
+            captions: CaptionSettings {
+                enabled: false,
+                highlight_words: vec![],
+                highlight_color: "#FFFF00".to_string(),
+                font: "Arial Black".to_string(),
+                font_size: 80,
+                stroke_width: 4,
+                shadow: false,
+                position: "bottom".to_string(),
+                whisper_model: "base".to_string(),
+            },
+            overlays: OverlaySettings {
+                progress_bar: false,
+                dynamic_watermark: false,
+                watermark_path: None,
+                blurred_background: true,
+                typewriter_hook: false,
+                typewriter_text: String::new(),
+            },
+            audio: AudioSettings {
+                loudness_normalization: false,
+                target_lufs: -14.0,
+            },
+            render: RenderSettings {
+                bitrate: 8,
+                codec: "h264".to_string(),
+                gpu_acceleration: false,
+                dry_run: false,
+                export_formats: vec!["9:16".to_string()],
+                fill_percent: 0,
+                output_directory: "/tmp".to_string(),
+            },
+        }
+    }
+
+    #[test]
+    fn test_get_video_codec() {
+        assert_eq!(get_video_codec("h264", false), "libx264");
+        assert_eq!(get_video_codec("h264", true), "h264_nvenc");
+        assert_eq!(get_video_codec("h265", false), "libx265");
+        assert_eq!(get_video_codec("h265", true), "hevc_nvenc");
+        assert_eq!(get_video_codec("vp9", false), "libvpx-vp9");
+        assert_eq!(get_video_codec("vp9", true), "libvpx-vp9");
+        assert_eq!(get_video_codec("unknown", false), "libx264");
+    }
+
+    #[test]
+    fn test_format_to_resolution() {
+        assert_eq!(format_to_resolution("9:16"), Some((1080, 1920)));
+        assert_eq!(format_to_resolution("16:9"), Some((1920, 1080)));
+        assert_eq!(format_to_resolution("1:1"), Some((1080, 1080)));
+        assert_eq!(format_to_resolution("invalid"), None);
+        assert_eq!(format_to_resolution(""), None);
+    }
+
+    #[test]
+    fn test_aspect_to_resolution() {
+        assert_eq!(aspect_to_resolution(9, 16), (1080, 1920));
+        assert_eq!(aspect_to_resolution(16, 9), (1920, 1080));
+        assert_eq!(aspect_to_resolution(1, 1), (1080, 1080));
+        assert_eq!(aspect_to_resolution(4, 5), (1080, 1350));
+        assert_eq!(aspect_to_resolution(4, 3), (1440, 1080));
+        // Generic fallback: larger dim → 1920
+        let (w, h) = aspect_to_resolution(3, 2);
+        assert!(w > 0 && h > 0);
+        assert!(w % 2 == 0 && h % 2 == 0); // even dimensions
+    }
+
+    #[test]
+    fn test_parse_aspect_from_output() {
+        assert_eq!(
+            parse_aspect_from_output("/tmp/video_9x16.mp4"),
+            Some((1080, 1920))
+        );
+        assert_eq!(
+            parse_aspect_from_output("/tmp/video_16x9.mp4"),
+            Some((1920, 1080))
+        );
+        assert_eq!(
+            parse_aspect_from_output("/tmp/video_1x1.mp4"),
+            Some((1080, 1080))
+        );
+        assert_eq!(parse_aspect_from_output("/tmp/video.mp4"), None);
+    }
+
+    #[test]
+    fn test_build_ffmpeg_args_basic() {
+        let config = default_config();
+        let args = build_ffmpeg_args(
+            "input.mp4",
+            "/tmp/output_9x16.mp4",
+            &config,
+            None,
+            60.0,
+            None,
+        );
+        assert!(args.contains(&"-i".to_string()));
+        assert!(args.contains(&"input.mp4".to_string()));
+        assert!(args.contains(&"-c:v".to_string()));
+        assert!(args.contains(&"libx264".to_string()));
+        assert!(args.contains(&"-b:v".to_string()));
+        assert!(args.contains(&"8M".to_string()));
+        assert!(args.contains(&"-y".to_string()));
+        assert_eq!(args.last().unwrap(), "/tmp/output_9x16.mp4");
+    }
+
+    #[test]
+    fn test_build_ffmpeg_args_gpu() {
+        let mut config = default_config();
+        config.render.gpu_acceleration = true;
+        let args = build_ffmpeg_args(
+            "input.mp4",
+            "/tmp/output_9x16.mp4",
+            &config,
+            None,
+            60.0,
+            None,
+        );
+        assert!(args.contains(&"h264_nvenc".to_string()));
+    }
+
+    #[test]
+    fn test_build_ffmpeg_args_loudness_normalization() {
+        let mut config = default_config();
+        config.audio.loudness_normalization = true;
+        config.audio.target_lufs = -16.0;
+        let args = build_ffmpeg_args(
+            "input.mp4",
+            "/tmp/output_9x16.mp4",
+            &config,
+            None,
+            60.0,
+            None,
+        );
+        let filter_idx = args.iter().position(|a| a == "-filter_complex" || a == "-af");
+        assert!(filter_idx.is_some(), "Should have audio filter for loudness normalization");
+    }
+
+    #[test]
+    fn test_build_concat_args_with_audio() {
+        let args = build_concat_args(
+            "intro.mp4",
+            "main.mp4",
+            "output.mp4",
+            "h264",
+            false,
+            8,
+            1080,
+            1920,
+            true,
+        );
+        assert!(args.contains(&"-y".to_string()));
+        assert!(args.contains(&"intro.mp4".to_string()));
+        assert!(args.contains(&"main.mp4".to_string()));
+        assert!(args.contains(&"libx264".to_string()));
+        assert!(args.contains(&"aac".to_string()));
+        assert_eq!(args.last().unwrap(), "output.mp4");
+        // Should NOT have -shortest when main has audio
+        assert!(!args.contains(&"-shortest".to_string()));
+    }
+
+    #[test]
+    fn test_build_concat_args_without_audio() {
+        let args = build_concat_args(
+            "intro.mp4",
+            "main.mp4",
+            "output.mp4",
+            "h264",
+            false,
+            8,
+            1080,
+            1920,
+            false,
+        );
+        // Should have -shortest when main lacks audio
+        assert!(args.contains(&"-shortest".to_string()));
+        // Filter should contain anullsrc
+        let filter_idx = args.iter().position(|a| a == "-filter_complex").unwrap();
+        let filter = &args[filter_idx + 1];
+        assert!(filter.contains("anullsrc"));
+    }
+
+    #[test]
+    fn test_build_typewriter_intro_args() {
+        let args = build_typewriter_intro_args(
+            "source.mp4",
+            "tts.mp3",
+            "output.mp4",
+            "Hello World",
+            3.0,
+            1080,
+            1920,
+        );
+        assert!(args.contains(&"-i".to_string()));
+        assert!(args.contains(&"source.mp4".to_string()));
+        assert!(args.contains(&"tts.mp3".to_string()));
+        assert!(args.contains(&"-y".to_string()));
+        assert_eq!(args.last().unwrap(), "output.mp4");
+        // Should have filter_complex with drawtext
+        let filter_idx = args.iter().position(|a| a == "-filter_complex").unwrap();
+        let filter = &args[filter_idx + 1];
+        assert!(filter.contains("drawtext"));
+    }
+
+    #[test]
+    fn test_escape_font_path_windows() {
+        // On Windows, colons should be escaped
+        if cfg!(target_os = "windows") {
+            let result = escape_font_path("C:/Windows/Fonts/arial.ttf");
+            assert!(result.contains("C\\\\\\:"));
+        }
+    }
+
+    #[test]
+    fn test_escape_drawtext_text() {
+        assert_eq!(escape_drawtext_text("hello"), "hello");
+        assert_eq!(escape_drawtext_text("a:b"), "a\\:b");
+        // Single quotes should be replaced with Unicode right single quote
+        assert!(escape_drawtext_text("it's").contains('\u{2019}'));
+    }
 }

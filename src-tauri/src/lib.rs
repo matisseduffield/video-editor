@@ -27,6 +27,7 @@ pub fn run() {
             commands::retry_job,
             commands::remove_job,
             commands::move_job,
+            commands::clear_completed,
             commands::start_processing,
             commands::probe_video,
             commands::save_preset,
@@ -36,12 +37,14 @@ pub fn run() {
             commands::load_settings,
             commands::open_output_folder,
             commands::validate_ffmpeg,
+            commands::validate_dependencies,
             commands::extract_thumbnail,
             commands::start_watch_folder,
             commands::stop_watch_folder,
             commands::detect_gpu,
         ])
         .setup(|app| {
+            use tauri::Manager;
             let log_level = if cfg!(debug_assertions) {
                 log::LevelFilter::Debug
             } else {
@@ -52,6 +55,17 @@ pub fn run() {
                     .level(log_level)
                     .build(),
             )?;
+
+            // Initialize job persistence and load saved queue
+            let app_data_dir = app.path().app_data_dir()
+                .expect("failed to resolve app data dir");
+            let mgr: tauri::State<'_, JobManager> = app.state();
+            let mgr = mgr.inner().clone();
+            // Spawn async init on the Tauri runtime
+            tauri::async_runtime::spawn(async move {
+                mgr.init_persistence(app_data_dir).await;
+            });
+
             Ok(())
         })
         .run(tauri::generate_context!())

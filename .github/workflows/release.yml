@@ -61,6 +61,14 @@ jobs:
             Write-Host "::warning::watermark.png not found in src-tauri/binaries/ — dynamic watermark will be unavailable"
           }
 
+      # --- Run checks before building ---
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
       # --- Build Tauri ---
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -72,21 +80,35 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Video Editor ${{ github.ref_name }}"
           releaseBody: |
-            ## What's New in v0.4.0
+            ## What's New in v0.5.0 — Reliability & Core Pipeline
 
-            ### Bug Fixes
-            - **Fixed title bar drag & window controls** — Added missing Tauri v2 permissions for minimize, maximize, close, and drag
-            - **Fixed edge-tts `--rate` argument** — TTS no longer fails due to `-10%` being parsed as a flag
-            - **Fixed progress bar stuck at 0%** — Added phased progress tracking across TTS, transcription, and render stages
+            ### Job Queue Persistence
+            - Job queue is now saved to disk on every state change and restored on app launch
+            - Processing jobs reset to "queued" on restart; completed/failed are preserved
+            - Added "completed at" timestamp display on finished jobs
+            - "Clear" button now only removes completed/cancelled jobs via backend
 
-            ### Improvements
-            - **Blurred-frame hook intro** — Typewriter intro now shows the source video's first frame (blurred & darkened) instead of a black background
-            - **Phased progress tracking** — Progress bar smoothly updates: TTS (0-5%), transcription (5-15%), rendering (15-95%), finalize (95-100%)
-            - **GPU detection spinner** — Shows loading animation while detecting GPU encoders
-            - **Preset error toasts** — Save/load/delete preset failures now show user-visible error notifications
-            - **Safer caption rendering** — Removed `.unwrap()` calls in caption filter building
-            - **Cleaner production builds** — Gated Whisper debug output behind `#[cfg(debug_assertions)]`
-            - **Updater stability** — Fixed potential double update check on startup
+            ### Error Handling Hardening
+            - FFmpeg processes now have timeout guards (max of 30 min or 10× video duration)
+            - Failed jobs show expandable error details with full FFmpeg stderr
+            - App validates FFmpeg/FFprobe/Python availability on startup with diagnostic toast
+            - Missing font files now fall back to system defaults instead of crashing
+
+            ### Cross-Platform Font Resolution
+            - Replaced hardcoded Windows font paths with platform-aware resolution
+            - macOS: searches `/System/Library/Fonts/` and `/Library/Fonts/`
+            - Linux: searches `/usr/share/fonts/truetype/` directories
+            - Monospace font resolution for typewriter intro (Consolas / Menlo / DejaVu Sans Mono)
+
+            ### Progress Tracking Polish
+            - ETA display on processing jobs (estimated time remaining)
+            - Per-phase labels: "Generating TTS…", "Transcribing…", "Rendering (1/2)…"
+            - Progress guaranteed to reach 100% on completion
+            - Queue toolbar shows "X/Y done" counter during processing
+
+            ### Testing Infrastructure
+            - 12 Rust unit tests for FFmpeg argument builders, codec resolution, font handling
+            - CI: `cargo test` and `tsc --noEmit` run before building in release workflow
           releaseDraft: false
           prerelease: false
           tauriScript: npx tauri

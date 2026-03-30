@@ -19,6 +19,7 @@ export function VideoPlayer({ filePath, onClose }: VideoPlayerProps) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
@@ -26,6 +27,7 @@ export function VideoPlayer({ filePath, onClose }: VideoPlayerProps) {
         exit={{ scale: 0.95, opacity: 0 }}
         transition={{ duration: 0.2 }}
         className="relative max-w-2xl w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}

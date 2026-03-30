@@ -15,6 +15,7 @@ export interface Job {
   startedAt?: string;
   completedAt?: string;
   error?: string;
+  statusDetail?: string; // per-phase label: "Transcribing…", "Rendering (1/2)…"
   outputPaths?: string[];
   duration?: number; // seconds, from ffprobe
   resolution?: string; // e.g. "1920x1080"
