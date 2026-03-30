@@ -72,27 +72,21 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "Video Editor ${{ github.ref_name }}"
           releaseBody: |
-            ## What's New in v0.3.0
+            ## What's New in v0.4.0
 
-            ### New Features
-            - **Custom Frameless Title Bar** — Sleek borderless window with integrated minimize/maximize/close controls
-            - **Video Thumbnail Previews** — Automatically extracted thumbnails shown in job cards
-            - **Drag-to-Reorder Queue** — Reorder jobs by dragging with dnd-kit, smooth animations
-            - **Watch Folder Mode** — Monitor a folder for new video files, auto-queue them
-            - **Inline Video Playback** — Play completed videos directly inside the app
-            - **Custom Accent Color** — Pick any accent color from the sidebar color wheel
-            - **Splash Screen** — Animated startup splash with app branding
-            - **Framer Motion Transitions** — Smooth enter/exit animations for panels, cards, and overlays
-            - **Micro-interactions** — Press feedback on buttons, hover lift on cards, scale effects throughout
-            - **Parallel Job Processing** — Process up to 6 videos concurrently with configurable slider
-            - **GPU Auto-Detection** — Detects NVIDIA NVENC, AMD AMF, Intel QSV, Apple VideoToolbox
-            - **Settings Keyboard Navigation** — Ctrl+1 through Ctrl+5 to switch sidebar tabs
-            - **Auto-Update with Changelog** — Shows version comparison and release notes when updates are available
+            ### Bug Fixes
+            - **Fixed title bar drag & window controls** — Added missing Tauri v2 permissions for minimize, maximize, close, and drag
+            - **Fixed edge-tts `--rate` argument** — TTS no longer fails due to `-10%` being parsed as a flag
+            - **Fixed progress bar stuck at 0%** — Added phased progress tracking across TTS, transcription, and render stages
 
-            ### Bug Fixes & Improvements
-            - Fixed dynamic import inefficiency in watch folder toggle
-            - Removed unused `max_parallel` field from JobManager (now controlled per-invocation)
-            - Progress bar gradient now respects custom accent color
+            ### Improvements
+            - **Blurred-frame hook intro** — Typewriter intro now shows the source video's first frame (blurred & darkened) instead of a black background
+            - **Phased progress tracking** — Progress bar smoothly updates: TTS (0-5%), transcription (5-15%), rendering (15-95%), finalize (95-100%)
+            - **GPU detection spinner** — Shows loading animation while detecting GPU encoders
+            - **Preset error toasts** — Save/load/delete preset failures now show user-visible error notifications
+            - **Safer caption rendering** — Removed `.unwrap()` calls in caption filter building
+            - **Cleaner production builds** — Gated Whisper debug output behind `#[cfg(debug_assertions)]`
+            - **Updater stability** — Fixed potential double update check on startup
           releaseDraft: false
           prerelease: false
           tauriScript: npx tauri

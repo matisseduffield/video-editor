@@ -376,8 +376,10 @@ fn build_caption_filters(
     let mut filters: Vec<String> = Vec::new();
 
     for chunk in &chunks {
-        let start_s = chunk.first().unwrap().start_ms as f64 / 1000.0;
-        let end_s = chunk.last().unwrap().end_ms as f64 / 1000.0;
+        let Some(first) = chunk.first() else { continue };
+        let Some(last) = chunk.last() else { continue };
+        let start_s = first.start_ms as f64 / 1000.0;
+        let end_s = last.end_ms as f64 / 1000.0;
         // Small padding so captions don't flicker
         let end_s = end_s + 0.05;
 
@@ -513,7 +515,7 @@ pub async fn generate_tts_audio(python_path: &PathBuf, text: &str, output_path: 
     cmd.args([
             "-m", "edge_tts",
             "--voice", "en-US-AndrewNeural",
-            "--rate", "-10%",
+            "--rate=-10%",
             "--text", text,
             "--write-media", &output_path.to_string_lossy(),
         ])
@@ -571,8 +573,11 @@ pub async fn get_media_duration(
         .map_err(|_| "Could not parse duration".to_string())
 }
 
-/// Build FFmpeg args for creating a typewriter intro video
+/// Build FFmpeg args for creating a typewriter intro video.
+/// Uses the first frame of the source video (blurred) as the background,
+/// with typewriter text overlay and TTS audio.
 pub fn build_typewriter_intro_args(
+    source_video: &str,
     audio_path: &str,
     output_path: &str,
     text: &str,
@@ -582,34 +587,42 @@ pub fn build_typewriter_intro_args(
 ) -> Vec<String> {
     let mut args = Vec::new();
 
-    // Black background — pad 1s after TTS finishes so the hook breathes
-    let video_dur = duration + 1.0;
-    args.extend([
-        "-f".to_string(), "lavfi".to_string(),
-        "-i".to_string(),
-        format!("color=c=black:s={}x{}:d={:.2}:r=30", width, height, video_dur),
-    ]);
+    // Input 0: source video (we only use the first frame)
+    args.extend(["-i".to_string(), source_video.to_string()]);
 
-    // TTS audio input
+    // Input 1: TTS audio
     args.extend(["-i".to_string(), audio_path.to_string()]);
 
     args.push("-y".to_string());
 
-    // Build typewriter drawtext using -filter_complex (semicolons separate chains)
-    // This avoids comma-escaping issues in -vf
+    // Duration: TTS + 1s breathing room
+    let video_dur = duration + 1.0;
+
+    // Build typewriter drawtext filters
     let chars: Vec<char> = text.chars().collect();
     let char_delay = 0.065; // ~15 chars/sec
     let total_type_time = chars.len() as f64 * char_delay;
 
     let font_size = (height as f64 * 0.038).round() as i32;
-    // Triple-escape colon for fontfile: 
-    // level 1 (filtergraph): \\\: → \: 
-    // level 2 (av_opt): \: → :
     let fontfile = "C\\\\\\:/Windows/Fonts/consola.ttf";
 
-    let mut vf_parts = Vec::new();
+    // filter_complex: freeze first frame, scale+blur it, overlay typewriter text
+    // [0:v] → take 1 frame, loop it for the duration → scale to target → blur
+    let mut filter_parts = Vec::new();
 
-    // Progressive character reveal — one drawtext per character step
+    // Freeze the first frame and loop it for video_dur seconds
+    // Then scale to target resolution and apply heavy blur + slight darken
+    filter_parts.push(format!(
+        "[0:v]trim=start=0:end=0.1,loop={}:1:0,setpts=N/FRAME_RATE/TB,\
+         scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},\
+         boxblur=25:10,eq=brightness=-0.15[bg]",
+        (video_dur * 30.0).ceil() as i32,
+        w = width, h = height
+    ));
+
+    // Typewriter: progressive character reveal
+    let mut drawtext_parts = Vec::new();
+
     for i in 0..chars.len() {
         let visible: String = chars[..=i].iter().collect();
         let escaped = escape_drawtext_text(&visible);
@@ -617,57 +630,60 @@ pub fn build_typewriter_intro_args(
         let start = i as f64 * char_delay;
         let end = (i + 1) as f64 * char_delay;
 
-        // Use between() to avoid comma escaping issues in expressions
-        vf_parts.push(format!(
+        drawtext_parts.push(format!(
             "drawtext=text='{txt}':\
              fontfile={ff}:\
              fontsize={fs}:\
              fontcolor=white:\
+             borderw=2:bordercolor=black:\
+             shadowx=2:shadowy=2:shadowcolor=black@0.7:\
              x=(w-text_w)/2:y=(h-text_h)/2:\
              enable='between(t,{s:.4},{e:.4})'",
-            txt = escaped,
-            ff = fontfile,
-            fs = font_size,
-            s = start,
-            e = end,
+            txt = escaped, ff = fontfile, fs = font_size,
+            s = start, e = end,
         ));
     }
 
-    // After typing is complete: show full text with blinking cursor
+    // After typing: full text with blinking cursor
     let full_escaped = escape_drawtext_text(text);
     let cursor_escaped = escape_drawtext_text(&format!("{}|", text));
     let blink_start = total_type_time;
 
-    // Cursor visible (first half of 0.8s cycle)
-    vf_parts.push(format!(
+    drawtext_parts.push(format!(
         "drawtext=text='{txt}':\
          fontfile={ff}:\
          fontsize={fs}:\
          fontcolor=white:\
+         borderw=2:bordercolor=black:\
+         shadowx=2:shadowy=2:shadowcolor=black@0.7:\
          x=(w-text_w)/2:y=(h-text_h)/2:\
          enable='gte(t,{s:.4})*lt(mod(t-{s:.4},0.8),0.4)'",
-        txt = cursor_escaped,
-        ff = fontfile,
-        fs = font_size,
-        s = blink_start,
+        txt = cursor_escaped, ff = fontfile, fs = font_size, s = blink_start,
     ));
 
-    // Cursor hidden (second half of 0.8s cycle)
-    vf_parts.push(format!(
+    drawtext_parts.push(format!(
         "drawtext=text='{txt}':\
          fontfile={ff}:\
          fontsize={fs}:\
          fontcolor=white:\
+         borderw=2:bordercolor=black:\
+         shadowx=2:shadowy=2:shadowcolor=black@0.7:\
          x=(w-text_w)/2:y=(h-text_h)/2:\
          enable='gte(t,{s:.4})*gte(mod(t-{s:.4},0.8),0.4)'",
-        txt = full_escaped,
-        ff = fontfile,
-        fs = font_size,
-        s = blink_start,
+        txt = full_escaped, ff = fontfile, fs = font_size, s = blink_start,
     ));
 
-    // Join drawtext filters with comma (each handles its own time window)
-    args.extend(["-vf".to_string(), vf_parts.join(",")]);
+    // Combine: blurred bg → drawtext chain → trim to duration
+    let filter = format!(
+        "{bg};[bg]{dt},trim=duration={dur:.2},setpts=PTS-STARTPTS[vout]",
+        bg = filter_parts.join(";"),
+        dt = drawtext_parts.join(","),
+        dur = video_dur,
+    );
+
+    args.extend(["-filter_complex".to_string(), filter]);
+    args.extend(["-map".to_string(), "[vout]".to_string()]);
+    args.extend(["-map".to_string(), "1:a".to_string()]);
     args.extend(["-c:v".to_string(), "libx264".to_string()]);
     args.extend(["-pix_fmt".to_string(), "yuv420p".to_string()]);
     args.extend(["-c:a".to_string(), "aac".to_string()]);

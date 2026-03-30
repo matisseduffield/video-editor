@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, Loader2 } from "lucide-react";
 import { openDirectory, detectGpu, type GpuInfo } from "@/hooks/useTauri";
 import type { RenderSettings as RenderSettingsType, Codec, AspectRatio } from "@/types";
 import { useEffect, useState } from "react";
@@ -107,7 +107,7 @@ export function RenderSettings({ settings, onChange, maxParallelJobs, onMaxParal
         <div>
           <Label htmlFor="gpu">GPU Acceleration</Label>
           <p className="text-xs text-muted-foreground">
-            {gpuInfo?.available ? gpuInfo.name : gpuInfo === null ? "Detecting..." : "No GPU encoder found"}
+            {gpuInfo?.available ? gpuInfo.name : gpuInfo === null ? (<span className="inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />Detecting...</span>) : "No GPU encoder found"}
           </p>
         </div>
         <Switch

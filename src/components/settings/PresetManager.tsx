@@ -9,6 +9,7 @@ import {
   deletePreset as deletePresetFromBackend,
 } from "@/hooks/useTauri";
 import type { AppSettings, Preset } from "@/types";
+import { toast } from "sonner";
 
 interface PresetManagerProps {
   settings: AppSettings;
@@ -23,7 +24,7 @@ export function PresetManager({ settings, onLoadPreset }: PresetManagerProps) {
   useEffect(() => {
     loadPresets()
       .then(setPresets)
-      .catch((err) => console.error("Failed to load presets:", err));
+      .catch((err) => toast.error("Failed to load presets", { description: String(err) }));
   }, []);
 
   const savePreset = async () => {
@@ -43,7 +44,7 @@ export function PresetManager({ settings, onLoadPreset }: PresetManagerProps) {
       setPresets((prev) => [...prev, preset]);
       setNewPresetName("");
     } catch (err) {
-      console.error("Failed to save preset:", err);
+      toast.error("Failed to save preset", { description: String(err) });
     }
   };
 
@@ -52,7 +53,7 @@ export function PresetManager({ settings, onLoadPreset }: PresetManagerProps) {
       await deletePresetFromBackend(id);
       setPresets((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
-      console.error("Failed to delete preset:", err);
+      toast.error("Failed to delete preset", { description: String(err) });
     }
   };
 

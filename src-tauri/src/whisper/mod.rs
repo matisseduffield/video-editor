@@ -143,6 +143,7 @@ print(json.dumps(words))
     // Clean up WAV
     std::fs::remove_file(&wav_path).ok();
 
+    #[cfg(debug_assertions)]
     eprintln!("[Whisper] Transcribed {} words", segments.len());
     Ok(segments)
 }

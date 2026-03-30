@@ -94,7 +94,7 @@ export function Sidebar({
             onChange={(e) => updateSettings("accentColor", e.target.value)}
             className="sr-only"
           />
-          <span className="text-[10px] text-muted-foreground/40 font-mono">v0.3.0</span>
+          <span className="text-[10px] text-muted-foreground/40 font-mono">v0.4.0</span>
         </div>
       </div>
 

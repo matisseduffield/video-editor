@@ -38,7 +38,10 @@ export function useUpdater() {
     try {
       setStatus("downloading");
       const update = await check();
-      if (!update) return;
+      if (!update) {
+        setStatus("idle");
+        return;
+      }
 
       let totalBytes = 0;
       let downloadedBytes = 0;

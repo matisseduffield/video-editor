@@ -202,18 +202,44 @@ async fn process_single_job(
         "jobId": &job_id,
         "status": "processing"
     })).ok();
+    app.emit("job-progress", serde_json::json!({
+        "jobId": &job_id,
+        "progress": 0
+    })).ok();
 
     // Get video duration for progress calculation
     let duration_secs = get_video_duration(&ffprobe_path, &job.file_path).await.unwrap_or(1.0);
 
-    // Generate TTS audio if typewriter hook is enabled
+    // ── Phase weights for smooth progress bar ──
+    // TTS: 0..5%, Transcription: 5..15%, Rendering: 15..95%, Finalize: 95..100%
     let use_hook = config.overlays.typewriter_hook
         && !config.overlays.typewriter_text.trim().is_empty();
+    let tts_phase_end: u8 = if use_hook { 5 } else { 0 };
+    let transcribe_phase_end: u8 = tts_phase_end + if config.captions.enabled { 10 } else { 0 };
+    let render_phase_start: u8 = transcribe_phase_end;
+    let render_phase_end: u8 = 95;
+
+    // Helper to emit progress
+    let emit_progress = |app: &tauri::AppHandle, manager: &JobManager, job_id: &str, progress: u8| {
+        let app = app.clone();
+        let manager = manager.clone();
+        let job_id = job_id.to_string();
+        async move {
+            manager.update_progress(&job_id, progress).await;
+            app.emit("job-progress", serde_json::json!({
+                "jobId": &job_id,
+                "progress": progress
+            })).ok();
+        }
+    };
+
+    // Generate TTS audio if typewriter hook is enabled
     let temp_dir = std::env::temp_dir().join("video-editor").join(&job_id);
     let mut tts_audio_path: Option<std::path::PathBuf> = None;
     let mut tts_duration: f64 = 0.0;
 
     if use_hook {
+        emit_progress(&app, &manager, &job_id, 1).await;
         std::fs::create_dir_all(&temp_dir).ok();
         let audio_path = temp_dir.join("tts.mp3");
         match crate::ffmpeg::generate_tts_audio(
@@ -240,10 +266,12 @@ async fn process_single_job(
                 })).ok();
             }
         }
+        emit_progress(&app, &manager, &job_id, tts_phase_end).await;
     }
 
     // Transcribe for captions if enabled
     let caption_segments = if config.captions.enabled {
+        emit_progress(&app, &manager, &job_id, tts_phase_end + 1).await;
         std::fs::create_dir_all(&temp_dir).ok();
         app.emit("job-status", serde_json::json!({
             "jobId": &job_id,
@@ -251,7 +279,10 @@ async fn process_single_job(
             "detail": "Transcribing audio..."
         })).ok();
         match crate::whisper::transcribe(&ffmpeg_path, &python_path, &job.file_path, &temp_dir, &config.captions.whisper_model).await {
-            Ok(segs) => Some(segs),
+            Ok(segs) => {
+                emit_progress(&app, &manager, &job_id, transcribe_phase_end).await;
+                Some(segs)
+            },
             Err(e) => {
                 eprintln!("Transcription failed, skipping captions: {}", e);
                 app.emit("job-status", serde_json::json!({
@@ -259,6 +290,7 @@ async fn process_single_job(
                     "status": "processing",
                     "detail": format!("Caption transcription failed: {}. Continuing without captions.", e)
                 })).ok();
+                emit_progress(&app, &manager, &job_id, transcribe_phase_end).await;
                 None
             }
         }
@@ -266,8 +298,16 @@ async fn process_single_job(
         None
     };
 
-    // For each export format, run FFmpeg
-    for format in &config.render.export_formats {
+    // Emit progress at render phase start
+    emit_progress(&app, &manager, &job_id, render_phase_start).await;
+
+    // For each export format, run FFmpeg — divide render range equally
+    let format_count = config.render.export_formats.len().max(1) as f64;
+    let render_range = (render_phase_end - render_phase_start) as f64;
+
+    for (fmt_idx, format) in config.render.export_formats.iter().enumerate() {
+        let fmt_start = render_phase_start + (fmt_idx as f64 * render_range / format_count) as u8;
+        let fmt_end = render_phase_start + ((fmt_idx as f64 + 1.0) * render_range / format_count) as u8;
         // Check cancellation between formats
         let is_cancelled = {
             let jobs = manager.jobs.lock().await;
@@ -305,6 +345,7 @@ async fn process_single_job(
         // Spawn FFmpeg process, with GPU→CPU fallback
         let result = run_ffmpeg_with_progress(
             &ffmpeg_path, &args, duration_secs, &app, &job_id, &manager,
+            fmt_start, fmt_end,
         ).await;
 
         let result = if result.is_err() && config.render.gpu_acceleration {
@@ -320,6 +361,7 @@ async fn process_single_job(
             );
             run_ffmpeg_with_progress(
                 &ffmpeg_path, &cpu_args, duration_secs, &app, &job_id, &manager,
+                fmt_start, fmt_end,
             ).await
         } else {
             result
@@ -340,6 +382,7 @@ async fn process_single_job(
             let intro_path =
                 temp_dir.join(format!("intro_{}.mp4", format.replace(':', "x")));
             let intro_args = crate::ffmpeg::build_typewriter_intro_args(
+                &job.file_path,
                 &audio.to_string_lossy(),
                 &intro_path.to_string_lossy(),
                 &config.overlays.typewriter_text,
@@ -487,7 +530,9 @@ async fn run_ffmpeg_simple(
     }
 }
 
-/// Run FFmpeg and parse stderr for progress
+/// Run FFmpeg and parse stderr for progress.
+/// `progress_start` and `progress_end` define the overall progress range
+/// this FFmpeg invocation maps to (e.g. 15..95 for the render phase).
 async fn run_ffmpeg_with_progress(
     ffmpeg_path: &std::path::PathBuf,
     args: &[String],
@@ -495,6 +540,8 @@ async fn run_ffmpeg_with_progress(
     app: &tauri::AppHandle,
     job_id: &str,
     manager: &JobManager,
+    progress_start: u8,
+    progress_end: u8,
 ) -> Result<(), String> {
     use tokio::io::AsyncReadExt;
     use tokio::process::Command;
@@ -549,7 +596,9 @@ async fn run_ffmpeg_with_progress(
                         if let Some(time_str) = extract_time_from_line(&line) {
                             let elapsed = parse_ffmpeg_time(&time_str);
                             if duration_secs > 0.0 {
-                                let progress = ((elapsed / duration_secs) * 100.0).min(99.0) as u8;
+                                let ffmpeg_pct = (elapsed / duration_secs).min(1.0);
+                                let range = (progress_end - progress_start) as f64;
+                                let progress = (progress_start as f64 + ffmpeg_pct * range).min(progress_end.saturating_sub(1) as f64) as u8;
                                 // Throttle: only emit if progress actually changed
                                 let current = {
                                     let jobs = manager.jobs.lock().await;
