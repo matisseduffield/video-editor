@@ -8,4 +8,3 @@
 /binaries/ffmpeg/*.dll
 /binaries/python/
 /binaries/whisper/*
-/binaries/watermark.png
