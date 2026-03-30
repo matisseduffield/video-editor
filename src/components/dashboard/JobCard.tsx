@@ -74,10 +74,10 @@ export function JobCard({
   const isActive = job.status === "queued" || job.status === "processing";
 
   return (
-    <Card className="p-3 bg-card hover:bg-accent/30 transition-colors">
+    <Card className="p-3 bg-card/60 hover:bg-card transition-colors border-border/50 rounded-xl">
       <div className="flex items-start gap-3">
         {/* File icon */}
-        <div className="p-2 rounded-lg bg-muted shrink-0">
+        <div className="p-2 rounded-lg bg-accent/50 shrink-0">
           <Film className="h-4 w-4 text-muted-foreground" />
         </div>
 

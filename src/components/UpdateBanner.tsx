@@ -12,7 +12,7 @@ export function UpdateBanner() {
 
   if (status === "available") {
     return (
-      <div className="flex items-center justify-between gap-3 px-4 py-2 bg-primary/10 border-b border-primary/20">
+      <div className="flex items-center justify-between gap-3 px-4 py-2 bg-primary/8 border-b border-primary/15">
         <div className="flex items-center gap-2 text-sm">
           <Download className="h-4 w-4 text-primary" />
           <span>
@@ -29,7 +29,7 @@ export function UpdateBanner() {
 
   if (status === "downloading") {
     return (
-      <div className="flex items-center gap-3 px-4 py-2 bg-primary/10 border-b border-primary/20">
+      <div className="flex items-center gap-3 px-4 py-2 bg-primary/8 border-b border-primary/15">
         <Loader2 className="h-4 w-4 animate-spin text-primary" />
         <span className="text-sm">Downloading update...</span>
         <Progress value={progress} className="flex-1 max-w-48 h-2" />
@@ -40,7 +40,7 @@ export function UpdateBanner() {
 
   if (status === "ready") {
     return (
-      <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border-b border-green-500/20">
+      <div className="flex items-center gap-2 px-4 py-2 bg-success/8 border-b border-success/15">
         <span className="text-sm">Update installed — restarting...</span>
       </div>
     );

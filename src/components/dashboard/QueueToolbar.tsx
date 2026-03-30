@@ -4,7 +4,6 @@ import {
   StopCircle,
   RotateCcw,
   Trash2,
-  Activity,
   Play,
   Loader2,
 } from "lucide-react";
@@ -33,62 +32,65 @@ export function QueueToolbar({
   hasJobs,
 }: QueueToolbarProps) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
+    <div className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-card/30">
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Job Queue</span>
-        </div>
-
+        <span className="text-sm font-semibold tracking-tight">Queue</span>
         {hasJobs && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {processingCount > 0 && (
-              <Badge variant="default">{processingCount} processing</Badge>
+              <Badge variant="default" className="text-[10px] px-1.5 py-0">
+                {processingCount} active
+              </Badge>
             )}
             {queuedCount > 0 && (
-              <Badge variant="secondary">{queuedCount} queued</Badge>
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                {queuedCount} queued
+              </Badge>
             )}
             {failedCount > 0 && (
-              <Badge variant="destructive">{failedCount} failed</Badge>
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                {failedCount} failed
+              </Badge>
             )}
           </div>
         )}
       </div>
 
       {hasJobs && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {queuedCount > 0 && (
             <Button
               size="sm"
               onClick={onStartProcessing}
               disabled={isProcessing}
+              className="h-7 text-xs rounded-lg"
             >
               {isProcessing ? (
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
               ) : (
-                <Play className="h-3.5 w-3.5 mr-1.5" />
+                <Play className="h-3 w-3 mr-1" />
               )}
-              {isProcessing ? "Processing..." : "Start Processing"}
+              {isProcessing ? "Processing..." : "Start"}
             </Button>
           )}
           {failedCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={onRetryAllFailed}>
-              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-              Retry Failed
+            <Button variant="ghost" size="sm" onClick={onRetryAllFailed} className="h-7 text-xs">
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Retry
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={onClearCompleted}>
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Clear Done
+          <Button variant="ghost" size="sm" onClick={onClearCompleted} className="h-7 text-xs">
+            <Trash2 className="h-3 w-3 mr-1" />
+            Clear
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={onCancelAll}
-            className="text-destructive hover:text-destructive"
+            className="h-7 text-xs text-destructive hover:text-destructive"
           >
-            <StopCircle className="h-3.5 w-3.5 mr-1.5" />
-            Cancel All
+            <StopCircle className="h-3 w-3 mr-1" />
+            Stop
           </Button>
         </div>
       )}

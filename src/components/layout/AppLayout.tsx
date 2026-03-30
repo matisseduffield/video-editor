@@ -11,7 +11,7 @@ import {
 
 export function AppLayout() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [activeTab, setActiveTab] = useState<string>("captions");
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const initialized = useRef(false);
 
   // Load persisted settings on mount
@@ -57,8 +57,7 @@ export function AppLayout() {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
       <UpdateBanner />
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - Settings & Presets */}
+      <div className="flex flex-1 overflow-hidden relative">
         <Sidebar
           settings={settings}
           updateSettings={updateSettings}
@@ -66,8 +65,6 @@ export function AppLayout() {
           setActiveTab={setActiveTab}
           onLoadPreset={loadPreset}
         />
-
-        {/* Main Content - Job Queue & Drop Zone */}
         <MainPanel settings={settings} />
       </div>
     </div>

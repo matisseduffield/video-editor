@@ -45,19 +45,19 @@ export function DropZone({ onFilesAdded }: DropZoneProps) {
 
   return (
     <div
-      className={`flex flex-col items-center justify-center h-full rounded-xl border-2 border-dashed transition-all duration-200 ${
+      className={`flex flex-col items-center justify-center h-full rounded-2xl border-2 border-dashed transition-all duration-300 ${
         isDragging
-          ? "border-primary bg-primary/5 scale-[1.01]"
-          : "border-border hover:border-muted-foreground/50"
+          ? "border-primary/60 bg-primary/5 scale-[1.005]"
+          : "border-border/50 hover:border-muted-foreground/25"
       }`}
       onDragOver={preventDefaults}
       onDragLeave={preventDefaults}
       onDrop={preventDefaults}
     >
-      <div className="flex flex-col items-center gap-4 max-w-md text-center">
+      <div className="flex flex-col items-center gap-5 max-w-sm text-center">
         <div
-          className={`p-5 rounded-full transition-colors ${
-            isDragging ? "bg-primary/10" : "bg-muted"
+          className={`p-6 rounded-2xl transition-all duration-300 ${
+            isDragging ? "bg-primary/10 scale-110" : "bg-accent/50"
           }`}
         >
           {isDragging ? (
@@ -67,24 +67,22 @@ export function DropZone({ onFilesAdded }: DropZoneProps) {
           )}
         </div>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-1">
-            {isDragging ? "Drop your videos here" : "Drop videos to get started"}
+        <div className="space-y-1.5">
+          <h2 className="text-lg font-semibold tracking-tight">
+            {isDragging ? "Drop your videos" : "Drop videos to start"}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Supports MP4, MOV, MKV, AVI, and WebM files
+            MP4, MOV, MKV, AVI, WebM
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button onClick={handleBrowse} variant="outline" className="gap-2">
-            <FolderOpen className="h-4 w-4" />
-            Browse Files
-          </Button>
-        </div>
+        <Button onClick={handleBrowse} variant="outline" className="gap-2 rounded-xl">
+          <FolderOpen className="h-4 w-4" />
+          Browse Files
+        </Button>
 
-        <p className="text-xs text-muted-foreground/60 mt-2">
-          Configure captions, overlays, and output settings in the sidebar before processing
+        <p className="text-xs text-muted-foreground/40">
+          Configure settings from the sidebar icons
         </p>
       </div>
     </div>
