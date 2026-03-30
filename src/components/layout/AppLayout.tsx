@@ -37,6 +37,17 @@ export function AppLayout() {
     return () => clearTimeout(timer);
   }, [settings]);
 
+  // Close settings panel on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && activeTab) {
+        setActiveTab(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTab]);
+
   const updateSettings = useCallback(
     <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
       setSettings((prev) => ({ ...prev, [key]: value }));

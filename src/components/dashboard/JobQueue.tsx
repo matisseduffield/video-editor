@@ -30,10 +30,10 @@ export function JobQueue({
   };
 
   return (
-    <div className="flex flex-col h-full gap-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          {jobs.length} {jobs.length === 1 ? "job" : "jobs"} in queue
+    <div className="flex flex-col h-full gap-2">
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[11px] text-muted-foreground/60 font-medium">
+          {jobs.length} {jobs.length === 1 ? "video" : "videos"}
         </span>
         <Button variant="outline" size="sm" onClick={handleAddMore} className="h-7 text-xs rounded-lg">
           <Plus className="h-3.5 w-3.5 mr-1" />

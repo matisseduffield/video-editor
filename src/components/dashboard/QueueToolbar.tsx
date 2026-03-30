@@ -97,9 +97,9 @@ export function QueueToolbar({
         </div>
       )}
       {isProcessing && overallProgress > 0 && (
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary/10 overflow-hidden">
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary/10 overflow-hidden">
           <div
-            className="h-full bg-primary transition-all duration-700 ease-out"
+            className="h-full progress-gradient transition-all duration-700 ease-out"
             style={{ width: `${overallProgress}%` }}
           />
         </div>

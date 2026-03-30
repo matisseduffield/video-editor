@@ -74,11 +74,11 @@ export function JobCard({
   const isActive = job.status === "queued" || job.status === "processing";
 
   return (
-    <Card className={`p-3 transition-colors rounded-xl ${job.status === "processing" ? "bg-primary/[0.04] border-primary/15" : "bg-card/60 hover:bg-card border-border/50"}`}>
+    <Card className={`p-3 transition-all duration-200 rounded-xl ${job.status === "processing" ? "bg-primary/[0.04] border-primary/15 shadow-sm shadow-primary/5" : job.status === "completed" ? "bg-success/[0.03] border-success/10" : "bg-card/60 hover:bg-card border-border/50"}`}>
       <div className="flex items-start gap-3">
         {/* File icon */}
-        <div className="p-2 rounded-lg bg-accent/50 shrink-0">
-          <Film className="h-4 w-4 text-muted-foreground" />
+        <div className={`p-2 rounded-lg shrink-0 ${job.status === "completed" ? "bg-success/10" : job.status === "processing" ? "bg-primary/10" : "bg-accent/50"}`}>
+          <Film className={`h-4 w-4 ${job.status === "completed" ? "text-success" : job.status === "processing" ? "text-primary" : "text-muted-foreground"}`} />
         </div>
 
         {/* Info */}
@@ -98,7 +98,7 @@ export function JobCard({
           {/* Progress bar for active jobs */}
           {job.status === "processing" && (
             <div className="flex items-center gap-2 mt-1.5">
-              <Progress value={job.progress} className="flex-1" />
+              <Progress value={job.progress} shimmer className="flex-1" />
               <span className="text-xs text-muted-foreground w-8 text-right">
                 {job.progress}%
               </span>

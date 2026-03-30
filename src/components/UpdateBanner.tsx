@@ -12,14 +12,16 @@ export function UpdateBanner() {
 
   if (status === "available") {
     return (
-      <div className="flex items-center justify-between gap-3 px-4 py-2 bg-primary/8 border-b border-primary/15">
+      <div className="flex items-center justify-between gap-3 px-4 py-2 bg-primary/[0.06] border-b border-primary/10">
         <div className="flex items-center gap-2 text-sm">
-          <Download className="h-4 w-4 text-primary" />
+          <div className="p-1 rounded-md bg-primary/10">
+            <Download className="h-3.5 w-3.5 text-primary" />
+          </div>
           <span>
-            Update <strong>{newVersion}</strong> is available
+            Update <strong className="text-primary">{newVersion}</strong> is available
           </span>
         </div>
-        <Button size="sm" variant="default" onClick={installUpdate}>
+        <Button size="sm" variant="default" onClick={installUpdate} className="h-7 text-xs rounded-lg">
           <RefreshCw className="h-3 w-3 mr-1" />
           Update now
         </Button>
