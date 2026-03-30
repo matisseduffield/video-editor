@@ -33,7 +33,6 @@
     "resources": [
       "binaries/ffmpeg/*",
       "binaries/python/**/*",
-      "binaries/whisper/*",
       "binaries/watermark.png"
     ],
     "icon": [
