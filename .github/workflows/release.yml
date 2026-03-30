@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # --- Download FFmpeg ---
+      - name: Download FFmpeg
+        shell: pwsh
+        run: |
+          $ffmpegUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+          $zipPath = "$env:TEMP\ffmpeg.zip"
+          $extractPath = "$env:TEMP\ffmpeg-extract"
+          Invoke-WebRequest -Uri $ffmpegUrl -OutFile $zipPath -UseBasicParsing
+          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+          $ffmpegDir = Get-ChildItem -Path $extractPath -Directory | Select-Object -First 1
+          Copy-Item "$($ffmpegDir.FullName)\bin\ffmpeg.exe" "src-tauri\binaries\ffmpeg\ffmpeg.exe"
+          Copy-Item "$($ffmpegDir.FullName)\bin\ffprobe.exe" "src-tauri\binaries\ffmpeg\ffprobe.exe"
+          Write-Host "FFmpeg binaries copied"
+
+      # --- Setup Python bundle ---
+      - name: Setup Python embeddable bundle
+        shell: pwsh
+        run: .\scripts\setup-python-bundle.ps1
+
+      # --- Watermark (download from repo release or skip) ---
+      - name: Check watermark
+        shell: pwsh
+        run: |
+          $wmPath = "src-tauri\binaries\watermark.png"
+          if (Test-Path $wmPath) {
+            Write-Host "watermark.png found"
+          } else {
+            Write-Host "::warning::watermark.png not found in src-tauri/binaries/ — dynamic watermark will be unavailable"
+          }
+
+      # --- Build Tauri ---
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Video Editor ${{ github.ref_name }}"
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: false
+          prerelease: false
