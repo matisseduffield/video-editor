@@ -329,6 +329,16 @@ export function MainPanel({ settings }: MainPanelProps) {
   const processingCount = jobs.filter((j) => j.status === "processing").length;
   const failedCount = jobs.filter((j) => j.status === "failed").length;
 
+  const overallProgress = jobs.length > 0
+    ? Math.round(
+        jobs.reduce((sum, j) => {
+          if (j.status === "completed") return sum + 100;
+          if (j.status === "processing") return sum + j.progress;
+          return sum;
+        }, 0) / jobs.length
+      )
+    : 0;
+
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Toolbar */}
@@ -342,6 +352,7 @@ export function MainPanel({ settings }: MainPanelProps) {
         onStartProcessing={handleStartProcessing}
         isProcessing={isProcessing}
         hasJobs={hasJobs}
+        overallProgress={overallProgress}
       />
 
       {/* Drop Zone + Queue */}

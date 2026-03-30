@@ -54,6 +54,8 @@ export function RenderSettings({ settings, onChange }: RenderSettingsProps) {
 
   return (
     <div className="space-y-5">
+      <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest">Quality</p>
+
       {/* Output Bitrate */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -121,6 +123,8 @@ export function RenderSettings({ settings, onChange }: RenderSettingsProps) {
         />
       </div>
 
+      <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest pt-1">Export</p>
+
       {/* Export Formats */}
       <div className="space-y-2">
         <Label>Export Formats</Label>
@@ -165,6 +169,8 @@ export function RenderSettings({ settings, onChange }: RenderSettingsProps) {
           <span>Fill (crop sides)</span>
         </div>
       </div>
+
+      <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest pt-1">Output</p>
 
       {/* Output Directory */}
       <div className="space-y-2">

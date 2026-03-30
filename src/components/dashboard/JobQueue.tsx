@@ -35,8 +35,8 @@ export function JobQueue({
         <span className="text-xs text-muted-foreground">
           {jobs.length} {jobs.length === 1 ? "job" : "jobs"} in queue
         </span>
-        <Button variant="outline" size="sm" onClick={handleAddMore}>
-          <Plus className="h-3.5 w-3.5 mr-1.5" />
+        <Button variant="outline" size="sm" onClick={handleAddMore} className="h-7 text-xs rounded-lg">
+          <Plus className="h-3.5 w-3.5 mr-1" />
           Add Videos
         </Button>
       </div>

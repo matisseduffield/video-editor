@@ -74,7 +74,7 @@ export function JobCard({
   const isActive = job.status === "queued" || job.status === "processing";
 
   return (
-    <Card className="p-3 bg-card/60 hover:bg-card transition-colors border-border/50 rounded-xl">
+    <Card className={`p-3 transition-colors rounded-xl ${job.status === "processing" ? "bg-primary/[0.04] border-primary/15" : "bg-card/60 hover:bg-card border-border/50"}`}>
       <div className="flex items-start gap-3">
         {/* File icon */}
         <div className="p-2 rounded-lg bg-accent/50 shrink-0">

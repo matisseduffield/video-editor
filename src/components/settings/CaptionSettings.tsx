@@ -62,6 +62,8 @@ export function CaptionSettings({ settings, onChange }: CaptionSettingsProps) {
 
       {settings.enabled && (
         <>
+          <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest">Transcription</p>
+
           {/* Whisper Model */}
           <div className="space-y-2">
             <Label>Whisper Model</Label>
@@ -85,6 +87,8 @@ export function CaptionSettings({ settings, onChange }: CaptionSettingsProps) {
               Larger models are more accurate but slower. Downloaded on first use.
             </p>
           </div>
+
+          <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest pt-1">Typography</p>
 
           {/* Font */}
           <div className="space-y-2">
@@ -170,6 +174,8 @@ export function CaptionSettings({ settings, onChange }: CaptionSettingsProps) {
             </Select>
           </div>
 
+          <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest pt-1">Highlighting</p>
+
           {/* Highlight Color */}
           <div className="space-y-2">
             <Label>Highlight Colour</Label>
@@ -221,8 +227,8 @@ export function CaptionSettings({ settings, onChange }: CaptionSettingsProps) {
             </p>
           </div>
 
-          {/* Live Preview placeholder */}
-          <div className="rounded-lg border border-border bg-muted/50 p-4 text-center">
+          {/* Live Preview */}
+          <div className="rounded-xl border border-border/50 bg-muted/10 p-4 text-center">
             <p
               className="font-bold"
               style={{ fontSize: `${Math.min(settings.fontSize / 4, 32)}px` }}

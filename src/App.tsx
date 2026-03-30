@@ -8,7 +8,7 @@ function App() {
       <Toaster
         position="bottom-right"
         toastOptions={{
-          className: "bg-card text-card-foreground border-border",
+          className: "!bg-card !text-card-foreground !border-border/50 !shadow-2xl !shadow-black/30 !rounded-xl",
         }}
       />
     </>

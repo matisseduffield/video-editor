@@ -18,6 +18,8 @@ export function AudioSettings({ settings, onChange }: AudioSettingsProps) {
 
   return (
     <div className="space-y-5">
+      <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest">Normalisation</p>
+
       {/* Loudness Normalisation */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">

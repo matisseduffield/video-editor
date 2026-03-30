@@ -18,6 +18,8 @@ export function OverlaySettings({ settings, onChange }: OverlaySettingsProps) {
 
   return (
     <div className="space-y-5">
+      <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest">Effects</p>
+
       {/* Progress Bar */}
       <div className="flex items-center justify-between">
         <div>
@@ -62,6 +64,8 @@ export function OverlaySettings({ settings, onChange }: OverlaySettingsProps) {
           onCheckedChange={(v) => update("blurredBackground", v)}
         />
       </div>
+
+      <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest pt-1">Intro</p>
 
       {/* Typewriter Hook */}
       <div className="space-y-3">

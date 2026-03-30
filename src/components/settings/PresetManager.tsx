@@ -83,10 +83,13 @@ export function PresetManager({ settings, onLoadPreset }: PresetManagerProps) {
 
       {/* Preset list */}
       {presets.length === 0 ? (
-        <div className="text-center py-8 text-sm text-muted-foreground">
-          <p>No presets saved yet</p>
-          <p className="text-xs mt-1">
-            Configure your settings above and save them here
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="p-3 rounded-xl bg-muted/20 mb-3">
+            <Save className="h-6 w-6 text-muted-foreground/40" />
+          </div>
+          <p className="text-sm text-muted-foreground">No presets saved yet</p>
+          <p className="text-xs text-muted-foreground/50 mt-1">
+            Configure your settings and save them here
           </p>
         </div>
       ) : (

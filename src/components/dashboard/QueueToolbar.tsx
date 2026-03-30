@@ -18,6 +18,7 @@ interface QueueToolbarProps {
   onStartProcessing: () => void;
   isProcessing: boolean;
   hasJobs: boolean;
+  overallProgress: number;
 }
 
 export function QueueToolbar({
@@ -30,9 +31,10 @@ export function QueueToolbar({
   onStartProcessing,
   isProcessing,
   hasJobs,
+  overallProgress,
 }: QueueToolbarProps) {
   return (
-    <div className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-card/30">
+    <div className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-card/30 relative">
       <div className="flex items-center gap-3">
         <span className="text-sm font-semibold tracking-tight">Queue</span>
         {hasJobs && (
@@ -92,6 +94,14 @@ export function QueueToolbar({
             <StopCircle className="h-3 w-3 mr-1" />
             Stop
           </Button>
+        </div>
+      )}
+      {isProcessing && overallProgress > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary/10 overflow-hidden">
+          <div
+            className="h-full bg-primary transition-all duration-700 ease-out"
+            style={{ width: `${overallProgress}%` }}
+          />
         </div>
       )}
     </div>

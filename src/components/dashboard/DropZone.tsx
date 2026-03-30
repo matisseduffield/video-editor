@@ -47,8 +47,8 @@ export function DropZone({ onFilesAdded }: DropZoneProps) {
     <div
       className={`flex flex-col items-center justify-center h-full rounded-2xl border-2 border-dashed transition-all duration-300 ${
         isDragging
-          ? "border-primary/60 bg-primary/5 scale-[1.005]"
-          : "border-border/50 hover:border-muted-foreground/25"
+          ? "border-primary/50 bg-primary/[0.03] scale-[1.005]"
+          : "border-border/40 bg-card/20 hover:border-muted-foreground/20 hover:bg-card/30"
       }`}
       onDragOver={preventDefaults}
       onDragLeave={preventDefaults}
@@ -57,13 +57,15 @@ export function DropZone({ onFilesAdded }: DropZoneProps) {
       <div className="flex flex-col items-center gap-5 max-w-sm text-center">
         <div
           className={`p-6 rounded-2xl transition-all duration-300 ${
-            isDragging ? "bg-primary/10 scale-110" : "bg-accent/50"
+            isDragging
+              ? "bg-primary/10 scale-110 ring-2 ring-primary/20 shadow-lg shadow-primary/5"
+              : "bg-accent/40 ring-1 ring-border/30"
           }`}
         >
           {isDragging ? (
             <Upload className="h-10 w-10 text-primary animate-bounce" />
           ) : (
-            <Film className="h-10 w-10 text-muted-foreground" />
+            <Film className="h-10 w-10 text-muted-foreground/60" />
           )}
         </div>
 
