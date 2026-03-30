@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Video Editor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "com.videoeditor.app",
   "build": {
     "frontendDist": "../dist",
@@ -19,7 +19,7 @@
         "minHeight": 700,
         "resizable": true,
         "fullscreen": false,
-        "decorations": true
+        "decorations": false
       }
     ],
     "security": {

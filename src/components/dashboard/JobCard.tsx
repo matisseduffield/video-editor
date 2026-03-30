@@ -16,10 +16,16 @@ import {
   Ban,
   FolderOpen,
   Copy,
+  GripVertical,
+  PlayCircle,
 } from "lucide-react";
 import type { Job, JobStatus } from "@/types";
 import { openOutputFolder } from "@/hooks/useTauri";
 import { toast } from "sonner";
+import { useState } from "react";
+import { VideoPlayer } from "@/components/dashboard/VideoPlayer";
+import { AnimatePresence } from "framer-motion";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 
 interface JobCardProps {
   job: Job;
@@ -30,6 +36,7 @@ interface JobCardProps {
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  dragListeners?: SyntheticListenerMap;
 }
 
 const statusConfig: Record<
@@ -68,18 +75,43 @@ export function JobCard({
   onRemove,
   onMoveUp,
   onMoveDown,
+  dragListeners,
 }: JobCardProps) {
   const config = statusConfig[job.status];
   const StatusIcon = config.icon;
   const isActive = job.status === "queued" || job.status === "processing";
+  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
 
   return (
-    <Card className={`p-3 transition-all duration-200 rounded-xl ${job.status === "processing" ? "bg-primary/[0.04] border-primary/15 shadow-sm shadow-primary/5" : job.status === "completed" ? "bg-success/[0.03] border-success/10" : "bg-card/60 hover:bg-card border-border/50"}`}>
+    <>
+      <AnimatePresence>
+        {playingVideo && (
+          <VideoPlayer filePath={playingVideo} onClose={() => setPlayingVideo(null)} />
+        )}
+      </AnimatePresence>
+      <Card className={`p-3 transition-all duration-200 rounded-xl hover:translate-y-[-1px] hover:shadow-md hover:shadow-black/20 ${job.status === "processing" ? "bg-primary/[0.04] border-primary/15 shadow-sm shadow-primary/5" : job.status === "completed" ? "bg-success/[0.03] border-success/10" : "bg-card/60 hover:bg-card border-border/50"}`}>
       <div className="flex items-start gap-3">
-        {/* File icon */}
-        <div className={`p-2 rounded-lg shrink-0 ${job.status === "completed" ? "bg-success/10" : job.status === "processing" ? "bg-primary/10" : "bg-accent/50"}`}>
-          <Film className={`h-4 w-4 ${job.status === "completed" ? "text-success" : job.status === "processing" ? "text-primary" : "text-muted-foreground"}`} />
-        </div>
+        {/* Drag handle */}
+        <button
+          {...dragListeners}
+          className="mt-1.5 cursor-grab active:cursor-grabbing active:scale-110 text-muted-foreground/40 hover:text-muted-foreground hover:scale-110 transition-all shrink-0 touch-none"
+          tabIndex={-1}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        {/* Thumbnail or file icon */}
+        {job.thumbnailPath ? (
+          <img
+            src={job.thumbnailPath}
+            alt=""
+            className="w-14 h-10 rounded-lg object-cover shrink-0 bg-accent/50"
+          />
+        ) : (
+          <div className={`p-2 rounded-lg shrink-0 ${job.status === "completed" ? "bg-success/10" : job.status === "processing" ? "bg-primary/10" : "bg-accent/50"}`}>
+            <Film className={`h-4 w-4 ${job.status === "completed" ? "text-success" : job.status === "processing" ? "text-primary" : "text-muted-foreground"}`} />
+          </div>
+        )}
 
         {/* Info */}
         <div className="flex-1 min-w-0">
@@ -141,6 +173,15 @@ export function JobCard({
                   <span className="text-xs text-muted-foreground truncate flex-1">
                     {p.split(/[\\/]/).pop()}
                   </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setPlayingVideo(p)}
+                    title="Play video"
+                  >
+                    <PlayCircle className="h-3 w-3" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -225,5 +266,6 @@ export function JobCard({
         </div>
       </div>
     </Card>
+    </>
   );
 }

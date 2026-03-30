@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MainPanel } from "@/components/layout/MainPanel";
+import { TitleBar } from "@/components/layout/TitleBar";
 import { UpdateBanner } from "@/components/UpdateBanner";
+import { SplashScreen } from "@/components/SplashScreen";
 import type { AppSettings, Preset } from "@/types";
 import { DEFAULT_SETTINGS } from "@/types";
 import {
@@ -12,6 +14,7 @@ import {
 export function AppLayout() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [showSplash, setShowSplash] = useState(true);
   const initialized = useRef(false);
 
   // Load persisted settings on mount
@@ -37,11 +40,27 @@ export function AppLayout() {
     return () => clearTimeout(timer);
   }, [settings]);
 
-  // Close settings panel on Escape
+  // Apply accent color to CSS custom property
   useEffect(() => {
+    document.documentElement.style.setProperty("--color-primary", settings.accentColor);
+    document.documentElement.style.setProperty("--color-ring", settings.accentColor);
+  }, [settings.accentColor]);
+
+  // Close settings panel on Escape, Ctrl+1-5 to open tabs
+  useEffect(() => {
+    const tabIds = ["captions", "overlays", "audio", "render", "presets"];
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && activeTab) {
         setActiveTab(null);
+        return;
+      }
+      // Ctrl+1 through Ctrl+5 to toggle tabs
+      if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+        const idx = parseInt(e.key) - 1;
+        if (idx >= 0 && idx < tabIds.length) {
+          e.preventDefault();
+          setActiveTab(activeTab === tabIds[idx] ? null : tabIds[idx]);
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -67,6 +86,8 @@ export function AppLayout() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
+      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+      <TitleBar />
       <UpdateBanner />
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar

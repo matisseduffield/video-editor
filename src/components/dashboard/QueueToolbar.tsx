@@ -6,6 +6,7 @@ import {
   Trash2,
   Play,
   Loader2,
+  FolderSearch,
 } from "lucide-react";
 
 interface QueueToolbarProps {
@@ -19,6 +20,8 @@ interface QueueToolbarProps {
   isProcessing: boolean;
   hasJobs: boolean;
   overallProgress: number;
+  watchFolder: string | null;
+  onToggleWatchFolder: () => void;
 }
 
 export function QueueToolbar({
@@ -32,6 +35,8 @@ export function QueueToolbar({
   isProcessing,
   hasJobs,
   overallProgress,
+  watchFolder,
+  onToggleWatchFolder,
 }: QueueToolbarProps) {
   return (
     <div className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-card/30 relative">
@@ -56,6 +61,16 @@ export function QueueToolbar({
             )}
           </div>
         )}
+        <Button
+          variant={watchFolder ? "default" : "ghost"}
+          size="sm"
+          onClick={onToggleWatchFolder}
+          className="h-7 text-xs rounded-lg"
+          title={watchFolder ? `Watching: ${watchFolder}` : "Watch a folder for new videos"}
+        >
+          <FolderSearch className="h-3 w-3 mr-1" />
+          {watchFolder ? "Watching" : "Watch"}
+        </Button>
       </div>
 
       {hasJobs && (

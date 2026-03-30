@@ -9,10 +9,12 @@ use jobs::JobManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let job_manager = JobManager::new(3);
+    let job_manager = JobManager::new();
+    let watch_state = commands::WatchFolderState::new();
 
     tauri::Builder::default()
         .manage(job_manager)
+        .manage(watch_state)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
@@ -34,6 +36,10 @@ pub fn run() {
             commands::load_settings,
             commands::open_output_folder,
             commands::validate_ffmpeg,
+            commands::extract_thumbnail,
+            commands::start_watch_folder,
+            commands::stop_watch_folder,
+            commands::detect_gpu,
         ])
         .setup(|app| {
             let log_level = if cfg!(debug_assertions) {

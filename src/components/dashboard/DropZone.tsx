@@ -78,7 +78,7 @@ export function DropZone({ onFilesAdded }: DropZoneProps) {
           </p>
         </div>
 
-        <Button onClick={handleBrowse} variant="outline" className="gap-2 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all">
+        <Button onClick={handleBrowse} variant="outline" className="gap-2 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:scale-105 transition-all">
           <FolderOpen className="h-4 w-4" />
           Browse Files
         </Button>

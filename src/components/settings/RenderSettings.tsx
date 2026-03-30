@@ -10,12 +10,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FolderOpen } from "lucide-react";
-import { openDirectory } from "@/hooks/useTauri";
+import { openDirectory, detectGpu, type GpuInfo } from "@/hooks/useTauri";
 import type { RenderSettings as RenderSettingsType, Codec, AspectRatio } from "@/types";
+import { useEffect, useState } from "react";
 
 interface RenderSettingsProps {
   settings: RenderSettingsType;
   onChange: (settings: RenderSettingsType) => void;
+  maxParallelJobs: number;
+  onMaxParallelJobsChange: (value: number) => void;
 }
 
 const codecs: { value: Codec; label: string }[] = [
@@ -30,7 +33,13 @@ const aspectRatios: { value: AspectRatio; label: string; desc: string }[] = [
   { value: "16:9", label: "16:9", desc: "YouTube" },
 ];
 
-export function RenderSettings({ settings, onChange }: RenderSettingsProps) {
+export function RenderSettings({ settings, onChange, maxParallelJobs, onMaxParallelJobsChange }: RenderSettingsProps) {
+  const [gpuInfo, setGpuInfo] = useState<GpuInfo | null>(null);
+
+  useEffect(() => {
+    detectGpu().then(setGpuInfo).catch(() => {});
+  }, []);
+
   const update = <K extends keyof RenderSettingsType>(
     key: K,
     value: RenderSettingsType[K]
@@ -98,13 +107,14 @@ export function RenderSettings({ settings, onChange }: RenderSettingsProps) {
         <div>
           <Label htmlFor="gpu">GPU Acceleration</Label>
           <p className="text-xs text-muted-foreground">
-            NVENC / VideoToolbox
+            {gpuInfo?.available ? gpuInfo.name : gpuInfo === null ? "Detecting..." : "No GPU encoder found"}
           </p>
         </div>
         <Switch
           id="gpu"
           checked={settings.gpuAcceleration}
           onCheckedChange={(v) => update("gpuAcceleration", v)}
+          disabled={gpuInfo !== null && !gpuInfo.available}
         />
       </div>
 
@@ -186,6 +196,29 @@ export function RenderSettings({ settings, onChange }: RenderSettingsProps) {
           <FolderOpen className="h-4 w-4 mr-2" />
           {settings.outputDirectory || "Choose output folder..."}
         </Button>
+      </div>
+
+      <p className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-widest pt-1">Performance</p>
+
+      {/* Parallel Jobs */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Parallel Jobs</Label>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {maxParallelJobs}
+          </span>
+        </div>
+        <Slider
+          value={[maxParallelJobs]}
+          onValueChange={([v]) => onMaxParallelJobsChange(v)}
+          min={1}
+          max={6}
+          step={1}
+        />
+        <div className="flex justify-between text-[10px] text-muted-foreground">
+          <span>Sequential</span>
+          <span>6 concurrent</span>
+        </div>
       </div>
     </div>
   );

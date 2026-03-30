@@ -46,6 +46,7 @@ export async function startProcessing(
       audio: config.audio,
       render: config.render,
     },
+    maxParallel: config.maxParallelJobs,
   });
 }
 
@@ -61,6 +62,49 @@ export async function openOutputFolder(filePath: string): Promise<void> {
 
 export async function validateFfmpeg(): Promise<string> {
   return invoke("validate_ffmpeg");
+}
+
+export interface GpuInfo {
+  available: boolean;
+  nvenc: boolean;
+  amf: boolean;
+  qsv: boolean;
+  videotoolbox: boolean;
+  name: string;
+}
+
+export async function detectGpu(): Promise<GpuInfo> {
+  return invoke("detect_gpu");
+}
+
+export async function extractThumbnail(
+  filePath: string,
+  jobId: string
+): Promise<string> {
+  return invoke("extract_thumbnail", { filePath, jobId });
+}
+
+// ── Watch folder ───────────────────────────────────────────────
+
+export async function startWatchFolder(folderPath: string): Promise<void> {
+  return invoke("start_watch_folder", { folderPath });
+}
+
+export async function stopWatchFolder(): Promise<void> {
+  return invoke("stop_watch_folder");
+}
+
+export interface WatchFolderFile {
+  name: string;
+  path: string;
+}
+
+export function onWatchFolderFiles(
+  callback: (files: WatchFolderFile[]) => void
+): Promise<UnlistenFn> {
+  return listen<WatchFolderFile[]>("watch-folder-files", (event) =>
+    callback(event.payload)
+  );
 }
 
 // ── Presets ────────────────────────────────────────────────────

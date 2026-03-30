@@ -9,6 +9,8 @@ export function useUpdater() {
   const [status, setStatus] = useState<UpdateStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [newVersion, setNewVersion] = useState<string | null>(null);
+  const [currentVersion, setCurrentVersion] = useState<string | null>(null);
+  const [changelog, setChangelog] = useState<string | null>(null);
 
   const checkForUpdate = async () => {
     try {
@@ -17,6 +19,8 @@ export function useUpdater() {
 
       if (update) {
         setNewVersion(update.version);
+        setCurrentVersion(update.currentVersion);
+        setChangelog(update.body ?? null);
         setStatus("available");
         toast.info(`Update ${update.version} available!`, {
           description: "Click the update banner to install.",
@@ -26,7 +30,6 @@ export function useUpdater() {
         setStatus("idle");
       }
     } catch {
-      // Silently fail — update check is non-critical
       setStatus("idle");
     }
   };
@@ -70,6 +73,8 @@ export function useUpdater() {
         if (cancelled) return;
         if (update) {
           setNewVersion(update.version);
+          setCurrentVersion(update.currentVersion);
+          setChangelog(update.body ?? null);
           setStatus("available");
           toast.info(`Update ${update.version} available!`, {
             description: "Click the update banner to install.",
@@ -83,5 +88,5 @@ export function useUpdater() {
     return () => { cancelled = true; };
   }, []);
 
-  return { status, progress, newVersion, checkForUpdate, installUpdate };
+  return { status, progress, newVersion, currentVersion, changelog, checkForUpdate, installUpdate };
 }

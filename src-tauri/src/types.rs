@@ -107,4 +107,10 @@ pub struct AppSettings {
     pub render: RenderSettings,
     pub watch_folder: Option<String>,
     pub max_parallel_jobs: u32,
+    #[serde(default = "default_accent_color")]
+    pub accent_color: String,
+}
+
+fn default_accent_color() -> String {
+    "#38BDF8".to_string()
 }

@@ -14,9 +14,16 @@ import {
   onJobStatus,
   probeVideo,
   validateFfmpeg,
+  extractThumbnail,
+  startWatchFolder,
+  stopWatchFolder,
+  onWatchFolderFiles,
+  openDirectory,
 } from "@/hooks/useTauri";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "framer-motion";
 
 const ACCEPTED_EXTENSIONS = [".mp4", ".mov", ".mkv", ".avi", ".webm"];
 
@@ -27,6 +34,7 @@ interface MainPanelProps {
 export function MainPanel({ settings }: MainPanelProps) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [watchFolder, setWatchFolder] = useState<string | null>(null);
   const isProcessingRef = useRef(false);
   const unlistenRefs = useRef<UnlistenFn[]>([]);
 
@@ -151,6 +159,32 @@ export function MainPanel({ settings }: MainPanelProps) {
     };
   }, []);
 
+  // Listen for watch folder events
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    let cancelled = false;
+
+    onWatchFolderFiles((files) => {
+      if (!cancelled && files.length > 0) {
+        addJobsToBackend(files)
+          .then((created) => {
+            setJobs((prev) => [...prev, ...created]);
+            probeAndEnrich(created);
+            toast.info(`Watch folder: added ${created.length} video(s)`);
+          })
+          .catch(() => {});
+      }
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
   // Probe videos for metadata and enrich job objects
   const probeAndEnrich = useCallback(async (created: Job[]) => {
     for (const job of created) {
@@ -174,6 +208,19 @@ export function MainPanel({ settings }: MainPanelProps) {
         );
       } catch {
         // Probe failed — non-critical, skip
+      }
+
+      // Extract thumbnail
+      try {
+        const thumbPath = await extractThumbnail(job.filePath, job.id);
+        const thumbUrl = convertFileSrc(thumbPath);
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === job.id ? { ...j, thumbnailPath: thumbUrl } : j
+          )
+        );
+      } catch {
+        // Thumbnail extraction failed — non-critical
       }
     }
   }, []);
@@ -300,6 +347,33 @@ export function MainPanel({ settings }: MainPanelProps) {
     });
   };
 
+  const reorderJobs = (activeId: string, overId: string) => {
+    setJobs((prev) => {
+      const oldIndex = prev.findIndex((j) => j.id === activeId);
+      const newIndex = prev.findIndex((j) => j.id === overId);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(oldIndex, 1);
+      next.splice(newIndex, 0, moved);
+      return next;
+    });
+  };
+
+  const handleToggleWatchFolder = async () => {
+    if (watchFolder) {
+      await stopWatchFolder();
+      setWatchFolder(null);
+      toast.info("Watch folder disabled");
+    } else {
+      const dir = await openDirectory();
+      if (dir) {
+        await startWatchFolder(dir);
+        setWatchFolder(dir);
+        toast.success("Watching folder for new videos");
+      }
+    }
+  };
+
   const handleStartProcessing = async () => {
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
@@ -353,22 +427,45 @@ export function MainPanel({ settings }: MainPanelProps) {
         isProcessing={isProcessing}
         hasJobs={hasJobs}
         overallProgress={overallProgress}
+        watchFolder={watchFolder}
+        onToggleWatchFolder={handleToggleWatchFolder}
       />
 
       {/* Drop Zone + Queue */}
       <div className="flex-1 overflow-hidden p-4">
-        {hasJobs ? (
-          <JobQueue
-            jobs={jobs}
-            onCancel={cancelJob}
-            onRetry={retryJob}
-            onRemove={removeJob}
-            onMove={moveJob}
-            onAddMore={addJobs}
-          />
-        ) : (
-          <DropZone onFilesAdded={addJobs} />
-        )}
+        <AnimatePresence mode="wait">
+          {hasJobs ? (
+            <motion.div
+              key="queue"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="h-full"
+            >
+              <JobQueue
+                jobs={jobs}
+                onCancel={cancelJob}
+                onRetry={retryJob}
+                onRemove={removeJob}
+                onMove={moveJob}
+                onReorder={reorderJobs}
+                onAddMore={addJobs}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="dropzone"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="h-full"
+            >
+              <DropZone onFilesAdded={addJobs} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

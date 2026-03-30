@@ -6,16 +6,15 @@ use crate::types::{Job, JobStatus};
 
 /// Thread-safe job queue manager.
 /// Manages the queue of processing jobs and limits concurrent execution.
+#[derive(Clone)]
 pub struct JobManager {
     pub jobs: Arc<Mutex<VecDeque<Job>>>,
-    pub max_parallel: usize,
 }
 
 impl JobManager {
-    pub fn new(max_parallel: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             jobs: Arc::new(Mutex::new(VecDeque::new())),
-            max_parallel,
         }
     }
 

@@ -19,6 +19,7 @@ export interface Job {
   duration?: number; // seconds, from ffprobe
   resolution?: string; // e.g. "1920x1080"
   fileSize?: number; // bytes
+  thumbnailPath?: string; // local path to thumbnail image
 }
 
 export type CaptionPosition = "top" | "center" | "bottom";
@@ -90,6 +91,7 @@ export interface AppSettings {
   render: RenderSettings;
   watchFolder?: string;
   maxParallelJobs: number; // 1-6
+  accentColor: string; // hex color for primary accent
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -125,4 +127,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
     outputDirectory: "",
   },
   maxParallelJobs: 3,
+  accentColor: "#38BDF8",
 };
